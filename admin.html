@@ -10,19 +10,17 @@
             padding: 30px; 
             border-radius: 12px; 
             box-shadow: 0 6px 15px rgba(0, 0, 0, 0.15); 
-            max-width: 700px; /* ขยายความกว้าง */
+            max-width: 700px; 
             margin: auto; 
-            display: flex; /* จัดเรียงส่วนประกอบในแนวนอน */
-            gap: 30px; /* ช่องว่างระหว่างสองคอลัมน์ */
+            display: flex; 
+            gap: 30px; 
         }
         .section { flex: 1; padding: 15px; border-radius: 8px; }
         
-        /* สไตล์สำหรับส่วน ออกคิวใหม่ */
         .add-section { background-color: #e6f7ff; border: 2px solid #337ab7; }
         #new-queue-display { font-size: 3em; font-weight: bold; color: #ff8c00; margin: 15px 0; }
         #btn-add-queue { background-color: #337ab7; }
 
-        /* สไตล์สำหรับส่วน เรียกคิว */
         .call-section { background-color: #e6ffed; border: 2px solid #5cb85c; }
         #current-queue-display { font-size: 3em; font-weight: bold; color: #5cb85c; margin: 15px 0; }
         #btn-call-next { background-color: #5cb85c; }
@@ -107,7 +105,7 @@
                     
                     // หากยังไม่มีคิวที่เรียกอยู่ ให้ตั้งคิวใหม่เป็นคิวแรกที่เรียก
                     currentQueueRef.once('value').then(currentSnap => {
-                        if (!currentSnap.exists() || currentSnap.val() === "") {
+                        if (!currentSnap.exists() || currentSnap.val() === "A000" || currentSnap.val() === "---") {
                              currentQueueRef.set(newQueueId);
                         }
                     });
@@ -128,7 +126,7 @@
             getMessageElement('call').innerText = 'พร้อมใช้งาน';
         });
 
-        // ฟังก์ชันสำหรับหาคิวถัดไปจากรายการ (QueuesList)
+        // ฟังก์ชันสำหรับหาคิวถัดไปที่ "Waiting" จากรายการ (QueuesList)
         function findNextQueue(queuesList) {
             let nextQueueId = null;
 
@@ -156,8 +154,8 @@
                 const nextQueue = findNextQueue(queuesList);
 
                 if (nextQueue) {
-                    // 2. อัปเดตสถานะคิวเดิมให้เป็น "Done" (ถ้ามีคิวเดิมที่ไม่ได้เป็น "---")
-                    if (currentCall !== "---" && queuesList[currentCall] === "Waiting") {
+                    // 2. อัปเดตสถานะคิวเดิมให้เป็น "Done" (ถ้ามีคิวเดิมที่ไม่ได้เป็น A000 หรือ ---)
+                    if (currentCall !== "A000" && currentCall !== "---" && queuesList[currentCall] === "Waiting") {
                          db.ref('QueuesList/' + currentCall).set("Done");
                     }
                     
