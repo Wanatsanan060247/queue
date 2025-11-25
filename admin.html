@@ -14,8 +14,9 @@
             margin: auto; 
             display: flex; 
             gap: 30px; 
+            flex-wrap: wrap; /* ทำให้ปุ่ม Reset สามารถอยู่ด้านล่างได้ */
         }
-        .section { flex: 1; padding: 15px; border-radius: 8px; }
+        .section { flex: 1; padding: 15px; border-radius: 8px; min-width: 300px; }
         
         .add-section { background-color: #e6f7ff; border: 2px solid #337ab7; }
         #new-queue-display { font-size: 3em; font-weight: bold; color: #ff8c00; margin: 15px 0; }
@@ -25,6 +26,8 @@
         #current-queue-display { font-size: 3em; font-weight: bold; color: #5cb85c; margin: 15px 0; }
         #btn-call-next { background-color: #5cb85c; }
         
+        #btn-reset { background-color: #d9534f; margin-top: 20px; width: 100%;} /* สไตล์สำหรับปุ่มรีเซ็ต */
+
         button { color: white; border: none; padding: 10px 20px; font-size: 1.1em; border-radius: 6px; cursor: pointer; transition: background-color 0.3s; width: 100%; }
         button:hover { filter: brightness(1.1); }
         button:disabled { background-color: #ccc; cursor: not-allowed; }
@@ -48,13 +51,19 @@
             <button id="btn-call-next" disabled>เรียกคิวถัดไป</button>
             <p id="call-status-msg" class="message" style="color: #5cb85c;"></p>
         </div>
+        
+        <div style="width: 100%; text-align: center;">
+            <button id="btn-reset" style="background-color: #d9534f; margin-top: 20px;">รีเซ็ตคิวรายวัน</button>
+            <p id="reset-status-msg" class="message" style="color: #d9534f;"></p>
+        </div>
+        
     </div>
     
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
 
     <script>
-        // 1. 🔑 โค้ด Firebase Config ของคุณ 🔑
+        // 1. 🔑 โค้ด Firebase Config ของคุณ 🔑 (แก้ไขแล้ว)
         const firebaseConfig = {
             apiKey: "AIzaSyB4ZlLgm23n_7E_vWjV2CJlVamfFy1ILrM",
             authDomain: "project01-55da2.firebaseapp.com",
@@ -80,7 +89,9 @@
             return "A" + number.toString().padStart(3, '0');
         }
         function getMessageElement(type) {
-            return document.getElementById(type === 'add' ? 'add-status-msg' : 'call-status-msg');
+            if (type === 'add') return document.getElementById('add-status-msg');
+            if (type === 'call') return document.getElementById('call-status-msg');
+            if (type === 'reset') return document.getElementById('reset-status-msg');
         }
 
         // --- 1. ส่วนควบคุมการออกคิวใหม่ (Add Queue) ---
@@ -181,6 +192,36 @@
                 document.getElementById('btn-call-next').disabled = false;
             });
         });
+
+        // --- 3. ส่วนควบคุมการรีเซ็ตคิว (Reset) ---
+
+        document.getElementById('btn-reset').addEventListener('click', () => {
+            if (!confirm("⚠️ คุณแน่ใจหรือไม่ว่าต้องการรีเซ็ตคิวทั้งหมด? การกระทำนี้ไม่สามารถยกเลิกได้!")) {
+                return;
+            }
+
+            document.getElementById('btn-reset').disabled = true;
+            getMessageElement('reset').innerText = 'กำลังรีเซ็ตฐานข้อมูล...';
+            
+            // 1. ตั้ง Counter กลับไปที่ 0
+            lastNumRef.set(0)
+            
+            // 2. ตั้ง current_queue กลับไปที่ A000
+            .then(() => currentQueueRef.set("A000"))
+            
+            // 3. ลบ QueuesList ทั้งหมด แล้วตั้งค่าเริ่มต้น A000: "Done" ใหม่
+            .then(() => queuesListRef.set({ "A000": "Done" }))
+            
+            .then(() => {
+                getMessageElement('reset').innerText = '✅ รีเซ็ตระบบคิวสำเร็จแล้ว! พร้อมสำหรับวันใหม่';
+                document.getElementById('btn-reset').disabled = false;
+            })
+            .catch((error) => {
+                getMessageElement('reset').innerText = 'เกิดข้อผิดพลาดในการรีเซ็ต: ' + error.message;
+                document.getElementById('btn-reset').disabled = false;
+            });
+        });
+
     </script>
 </body>
 </html>
