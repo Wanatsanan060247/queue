@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>แผงควบคุมคิว (Admin)</title>
+    <style>
+        body { font-family: Arial, sans-serif; text-align: center; margin-top: 50px; background-color: #f0f4f8; }
+        .container {
+            background-color: white;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 6px 15px rgba(0, 0, 0, 0.15);
+            max-width: 450px;
+            margin: auto;
+        }
+        h2 { color: #5cb85c; }
+        #current-queue-display {
+            font-size: 3em;
+            font-weight: bold;
+            color: #337ab7;
+            padding: 10px;
+            margin: 15px 0;
+            border: 2px solid #337ab7;
+            border-radius: 5px;
+            display: inline-block;
+        }
+        #btn-call-next {
+            background-color: #28a745; /* สีเขียว */
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            font-size: 1.2em;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        #btn-call-next:hover {
+            background-color: #1e7e34;
+        }
+        .message {
+            margin-top: 20px;
+            color: #dc3545;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>ควบคุมระบบคิว</h2>
+        <p>คิวที่กำลังแสดงผล (Current Queue):</p>
+        <div id="current-queue-display">กำลังโหลด...</div>
+        
+        <button id="btn-call-next" disabled>เรียกคิวถัดไป (Next Queue)</button>
+        
+        <div id="message" class="message"></div>
+    </div>
+
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+
+    <script>
+        // 1. 🔑 แทนที่ส่วนนี้ด้วยรหัส Config ของคุณ 🔑
+        const firebaseConfig = {
+            apiKey: "YOUR_API_KEY", 
+            authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
+            databaseURL: "https://YOUR-PROJECT-ID-default-rtdb.asia-southeast1.firebasedatabase.app",
+            projectId: "YOUR_PROJECT_ID",
+        };
+
+        // เริ่มต้นการทำงาน
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.database();
+        const queueRef = db.ref('QueueStatus/current_queue');
+        
+        let currentQueueValue = "A000"; // ค่าเริ่มต้น
+        let isReady = false;
+
+        // 2. ฟังการเปลี่ยนแปลงของคิวปัจจุบัน (สำหรับแสดงผลให้ Admin เห็น)
+        queueRef.on('value', (snapshot) => {
+            if (snapshot.exists()) {
+                currentQueueValue = snapshot.val();
+                document.getElementById('current-queue-display').innerText = currentQueueValue;
+                document.getElementById('btn-call-next').disabled = false;
+                isReady = true;
+                document.getElementById('message').innerText = 'พร้อมใช้งาน';
+            } else {
+                document.getElementById('message').innerText = 'ไม่พบข้อมูลคิว กรุณาตั้งค่าใน Firebase';
+            }
+        });
+
+        // 3. ฟังก์ชันสำหรับเพิ่มคิว (A001 -> A002)
+        function getNextQueue(queueId) {
+            // ตรวจสอบรูปแบบ: ถ้าไม่ใช่ A ตามด้วยตัวเลข ให้ส่งคืนค่าเดิม
+            const match = queueId.match(/^([A-Z])(\d+)$/);
+            if (!match) {
+                return queueId; 
+            }
+            
+            const prefix = match[1]; // A
+            const number = parseInt(match[2]); // 001
+            
+            // เพิ่มตัวเลข
+            const nextNumber = number + 1;
+            
+            // จัดรูปแบบให้เป็น 3 หลัก (002, 010, 100)
+            const nextNumberString = nextNumber.toString().padStart(3, '0');
+            
+            return prefix + nextNumberString;
+        }
+
+        // 4. จัดการเมื่อกดปุ่ม
+        document.getElementById('btn-call-next').addEventListener('click', () => {
+            if (!isReady) return;
+
+            const nextQueue = getNextQueue(currentQueueValue);
+            
+            // อัปเดตค่าคิวใหม่ลงใน Firebase
+            queueRef.set(nextQueue)
+                .then(() => {
+                    document.getElementById('message').innerText = `เรียกคิว ${nextQueue} สำเร็จ!`;
+                })
+                .catch(error => {
+                    document.getElementById('message').innerText = 'เกิดข้อผิดพลาดในการเขียนข้อมูล: ' + error.message;
+                });
+        });
+    </script>
+</body>
+</html>
