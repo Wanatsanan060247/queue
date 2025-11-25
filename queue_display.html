@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>ระบบคิว Real-time - ของคุณ</title>
+    <style>
+        body { font-family: Arial, sans-serif; text-align: center; margin-top: 50px; background-color: #f0f4f8; }
+        .container {
+            background-color: white;
+            padding: 40px 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+            max-width: 400px;
+            margin: auto;
+        }
+        h1 { color: #007bff; margin-bottom: 5px;}
+        #queue-display { 
+            font-size: 5em; 
+            font-weight: bold; 
+            color: #28a745; /* สีเขียว */
+            padding: 10px;
+            border: 3px solid #28a745;
+            border-radius: 8px;
+            display: inline-block;
+            margin-top: 15px;
+        }
+        .footer { margin-top: 30px; font-size: 0.8em; color: #6c757d; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>ขณะนี้ถึงคิวที่:</h1>
+        <div id="queue-display">กำลังเชื่อมต่อ...</div>
+        <p>โปรดรอเรียกคิวถัดไป</p>
+        <div class="footer">ระบบคิว Real-time</div>
+    </div>
+
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+
+    <script>
+        // 2. 🔑 วางโค้ด Config ที่นี่ 🔑
+        const firebaseConfig = {
+            apiKey: "AIzaSyB4ZlLgm23n_7E_vWjV2CJlVamfFy1ILrM",
+			authDomain: "project01-55da2.firebaseapp.com",
+			databaseURL: "https://project01-55da2-default-rtdb.asia-southeast1.firebasedatabase.app",
+			projectId: "project01-55da2",
+			storageBucket: "project01-55da2.firebasestorage.app",
+			messagingSenderId: "81556455932",
+			appId: "1:81556455932:web:b4aafe9bafd06b7a9f3279",
+			measurementId: "G-L4DLG93C5N"
+        };
+
+        // เริ่มต้นการทำงาน
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.database();
+
+        // 3. โค้ด Real-time: ฟังการเปลี่ยนแปลงของข้อมูล
+        // ฟังค่าที่ path 'QueueStatus/current_queue'
+        db.ref('QueueStatus/current_queue').on('value', (snapshot) => {
+            const displayElement = document.getElementById('queue-display');
+            if (snapshot.exists()) {
+                const currentQueue = snapshot.val();
+                // อัปเดตหน้าจอทันทีที่มีการเปลี่ยนแปลง
+                displayElement.innerText = currentQueue;
+                displayElement.style.color = '#28a745'; // สีเขียว
+            } else {
+                displayElement.innerText = 'ไม่พบข้อมูลคิว';
+                displayElement.style.color = '#dc3545'; // สีแดง
+            }
+        });
+    </script>
+</body>
+</html>
