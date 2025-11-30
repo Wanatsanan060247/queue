@@ -10,23 +10,27 @@
             padding: 30px; 
             border-radius: 12px; 
             box-shadow: 0 6px 15px rgba(0, 0, 0, 0.15); 
-            max-width: 700px; 
+            max-width: 750px; /* ขยายความกว้างเพื่อรองรับ 3 คอลัมน์ย่อย */
             margin: auto; 
             display: flex; 
-            gap: 30px; 
-            flex-wrap: wrap; /* ทำให้ปุ่ม Reset สามารถอยู่ด้านล่างได้ */
+            gap: 20px; 
+            flex-wrap: wrap;
         }
-        .section { flex: 1; padding: 15px; border-radius: 8px; min-width: 300px; }
+        .section { flex: 1; padding: 15px; border-radius: 8px; min-width: 200px; }
         
         .add-section { background-color: #e6f7ff; border: 2px solid #337ab7; }
-        #new-queue-display { font-size: 3em; font-weight: bold; color: #ff8c00; margin: 15px 0; }
+        #new-queue-display { font-size: 2.5em; font-weight: bold; color: #ff8c00; margin: 15px 0; }
         #btn-add-queue { background-color: #337ab7; }
 
         .call-section { background-color: #e6ffed; border: 2px solid #5cb85c; }
-        #current-queue-display { font-size: 3em; font-weight: bold; color: #5cb85c; margin: 15px 0; }
+        #current-queue-display { font-size: 2.5em; font-weight: bold; color: #5cb85c; margin: 15px 0; }
         #btn-call-next { background-color: #5cb85c; }
         
-        #btn-reset { background-color: #d9534f; margin-top: 20px; width: 100%;} /* สไตล์สำหรับปุ่มรีเซ็ต */
+        .recall-section { background-color: #fff8e1; border: 2px solid #ffc107; }
+        #txt-recall-queue { padding: 8px; margin-bottom: 10px; border: 1px solid #ccc; border-radius: 4px; width: 100%; box-sizing: border-box; text-align: center; font-size: 1.1em;}
+        #btn-recall { background-color: #ffc107; color: #333;}
+
+        #btn-reset { background-color: #d9534f; margin-top: 20px; width: 100%;} 
 
         button { color: white; border: none; padding: 10px 20px; font-size: 1.1em; border-radius: 6px; cursor: pointer; transition: background-color 0.3s; width: 100%; }
         button:hover { filter: brightness(1.1); }
@@ -45,18 +49,25 @@
         </div>
 
         <div class="section call-section">
-            <h2>📞 เรียกคิว</h2>
-            <p>คิวที่กำลังแสดงผล (Current Call):</p>
+            <h2>📞 เรียกคิวถัดไป</h2>
+            <p>คิวที่กำลังแสดงผล:</p>
             <div id="current-queue-display">กำลังโหลด...</div>
             <button id="btn-call-next" disabled>เรียกคิวถัดไป</button>
             <p id="call-status-msg" class="message" style="color: #5cb85c;"></p>
         </div>
         
+        <div class="section recall-section">
+            <h2>↩️ เรียกคิวเจาะจง</h2>
+            <p>กรอกคิวที่ต้องการเรียกซ้ำ/ย้อน:</p>
+            <input type="text" id="txt-recall-queue" placeholder="เช่น A008" maxlength="4">
+            <button id="btn-recall">เรียกคิวนี้</button>
+            <p id="recall-status-msg" class="message" style="color: #ffc107;"></p>
+        </div>
+
         <div style="width: 100%; text-align: center;">
             <button id="btn-reset" style="background-color: #d9534f; margin-top: 20px;">รีเซ็ตคิวรายวัน</button>
             <p id="reset-status-msg" class="message" style="color: #d9534f;"></p>
         </div>
-        
     </div>
     
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
@@ -92,6 +103,7 @@
             if (type === 'add') return document.getElementById('add-status-msg');
             if (type === 'call') return document.getElementById('call-status-msg');
             if (type === 'reset') return document.getElementById('reset-status-msg');
+            if (type === 'recall') return document.getElementById('recall-status-msg');
         }
 
         // --- 1. ส่วนควบคุมการออกคิวใหม่ (Add Queue) ---
@@ -150,7 +162,8 @@
 
             // วนลูปตามลำดับของ key (A001, A002, ...)
             for (const key in queuesList) {
-                if (queuesList[key] === "Waiting") {
+                // ตรวจสอบว่าเป็น Waiting และหมายเลขมากกว่าคิวปัจจุบัน
+                if (queuesList[key] === "Waiting" && key > currentCall) { 
                     nextQueueId = key;
                     break; // พบคิวแรกที่รออยู่แล้ว ออกจากลูป
                 }
@@ -158,32 +171,28 @@
             return nextQueueId;
         }
 
-        // จัดการเมื่อกดปุ่ม
+        // จัดการเมื่อกดปุ่ม Call Next
         document.getElementById('btn-call-next').addEventListener('click', () => {
             if (!isReady) return;
             document.getElementById('btn-call-next').disabled = true;
             getMessageElement('call').innerText = 'กำลังประมวลผล...';
 
-            // ดึงข้อมูลรายการคิวทั้งหมดมา
             queuesListRef.once('value').then(listSnapshot => {
                 const queuesList = listSnapshot.val();
-
-                // 1. หาคิวถัดไปที่ยังเป็น "Waiting"
                 const nextQueue = findNextQueue(queuesList);
 
                 if (nextQueue) {
-                    // 2. อัปเดตสถานะคิวเดิมให้เป็น "Done" (ถ้ามีคิวเดิมที่ไม่ได้เป็น A000 หรือ ---)
+                    // อัปเดตสถานะคิวเดิม (ถ้าคิวเดิมไม่ถูกข้ามและเป็น Waiting)
                     if (currentCall !== "A000" && currentCall !== "---" && queuesList[currentCall] === "Waiting") {
                          db.ref('QueuesList/' + currentCall).set("Done");
                     }
                     
-                    // 3. อัปเดตคิวใหม่ให้หน้าจอคนไข้เห็น (ใน QueueStatus)
                     currentQueueRef.set(nextQueue)
                         .then(() => {
                             getMessageElement('call').innerText = `เรียกคิว ${nextQueue} สำเร็จ!`;
                         });
                 } else {
-                    currentQueueRef.set("---"); // ไม่มีคิวแล้ว
+                    currentQueueRef.set("---");
                     getMessageElement('call').innerText = 'ไม่เหลือคิวที่รออยู่แล้ว';
                 }
                  document.getElementById('btn-call-next').disabled = false;
@@ -193,7 +202,46 @@
             });
         });
 
-        // --- 3. ส่วนควบคุมการรีเซ็ตคิว (Reset) ---
+        // --- 3. ส่วนควบคุมการเรียกคิวเจาะจง (Recall/Jump Back) ---
+
+        document.getElementById('btn-recall').addEventListener('click', () => {
+            const inputElement = document.getElementById('txt-recall-queue');
+            let recallId = inputElement.value.toUpperCase().trim();
+            inputElement.disabled = true;
+            document.getElementById('btn-recall').disabled = true;
+            getMessageElement('recall').innerText = 'กำลังตรวจสอบ...';
+            
+            // ตรวจสอบรูปแบบคิว A001 - A999
+            if (!/^A\d{3}$/.test(recallId)) {
+                getMessageElement('recall').innerText = 'รูปแบบคิวไม่ถูกต้อง (ต้องเป็น A ตามด้วย 3 ตัวเลข)';
+                inputElement.disabled = false;
+                document.getElementById('btn-recall').disabled = false;
+                return;
+            }
+
+            queuesListRef.child(recallId).once('value').then(snapshot => {
+                if (snapshot.exists()) {
+                    // คิวมีอยู่จริง: ตั้งค่า current_queue เป็นคิวนี้
+                    currentQueueRef.set(recallId)
+                        .then(() => {
+                            // ตั้งสถานะคิวที่เรียกซ้ำให้เป็น Waiting (เผื่อผู้ใช้อาจจะตั้งเป็น Done ไปแล้ว)
+                            queuesListRef.child(recallId).set("Waiting"); 
+                            getMessageElement('recall').innerText = `✅ เรียกคิว ${recallId} ซ้ำสำเร็จ!`;
+                        });
+                } else {
+                    getMessageElement('recall').innerText = `คิว ${recallId} ไม่เคยถูกออกมาก่อน`;
+                }
+                
+                inputElement.disabled = false;
+                document.getElementById('btn-recall').disabled = false;
+            }).catch(error => {
+                getMessageElement('recall').innerText = 'เกิดข้อผิดพลาด: ' + error.message;
+                inputElement.disabled = false;
+                document.getElementById('btn-recall').disabled = false;
+            });
+        });
+
+        // --- 4. ส่วนควบคุมการรีเซ็ตคิว (Reset) ---
 
         document.getElementById('btn-reset').addEventListener('click', () => {
             if (!confirm("⚠️ คุณแน่ใจหรือไม่ว่าต้องการรีเซ็ตคิวทั้งหมด? การกระทำนี้ไม่สามารถยกเลิกได้!")) {
@@ -221,7 +269,6 @@
                 document.getElementById('btn-reset').disabled = false;
             });
         });
-
     </script>
 </body>
 </html>
